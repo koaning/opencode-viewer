@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>opencode-viewer · live demo</title>
+    <meta name="description" content="A live dashboard of the current OpenCode session, in OpenCode Desktop's side region. Demo with a made-up session." />
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      body[data-mode="light"] {
+        background: #f3f3f1;
+        color: #0b0b0b;
+        --demo-panel: #fcfcfb;
+        --demo-muted: #52514e;
+        --demo-border: rgba(0, 0, 0, 0.1);
+        --demo-chip: rgba(0, 0, 0, 0.05);
+      }
+      /* Desktop sets these per theme; the dashboard's CSS only carries light fallbacks for most of them. */
+      body[data-mode="dark"] {
+        background: #111110;
+        color: #ededec;
+        --demo-panel: #1a1a19;
+        --demo-muted: #a3a29c;
+        --demo-border: rgba(255, 255, 255, 0.1);
+        --demo-chip: rgba(255, 255, 255, 0.07);
+        --v2-text-text-base: #ededec;
+        --v2-text-text-muted: #a3a29c;
+        --v2-text-text-faint: #75746f;
+        --v2-border-border-muted: rgba(255, 255, 255, 0.09);
+        --v2-background-bg-layer-01: rgba(255, 255, 255, 0.035);
+        --v2-background-bg-layer-02: rgba(255, 255, 255, 0.07);
+        --v2-background-bg-base: #1a1a19;
+      }
+      body[data-mode="light"] { --v2-background-bg-base: #fcfcfb; }
+
+      .demo { max-width: 760px; margin: 0 auto; padding: 32px 20px 48px; }
+      .demo h1 { font-size: 20px; margin: 0 0 4px; }
+      .demo p { margin: 0 0 16px; color: var(--demo-muted); max-width: 60ch; }
+      .demo a { color: inherit; }
+      .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 16px; font-size: 13px; }
+      .group { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--demo-chip); }
+      .group button, .replay {
+        all: unset;
+        cursor: pointer;
+        padding: 3px 10px;
+        border-radius: 6px;
+        color: var(--demo-muted);
+      }
+      .group button[aria-pressed="true"] { background: var(--demo-panel); color: inherit; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+      .replay { background: var(--demo-chip); color: inherit; }
+      .replay:disabled { opacity: 0.5; cursor: default; }
+      button:focus-visible { outline: 2px solid #2a78d6; outline-offset: 2px; }
+      .label { color: var(--demo-muted); margin-right: 4px; }
+
+      /* A stand-in for Desktop's side region: fixed height, and the dashboard scrolls inside it. */
+      .frame {
+        width: var(--demo-width, 560px);
+        max-width: 100%;
+        height: min(820px, calc(100vh - 160px));
+        min-height: 480px;
+        border: 1px solid var(--demo-border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--demo-panel);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        transition: width 0.3s ease;
+      }
+
+      /* ?shot: the bare dashboard at full height, for the README screenshots. */
+      body.shot { background: var(--demo-panel); }
+      body.shot .demo { max-width: none; padding: 0; }
+      body.shot .chrome { display: none; }
+      body.shot .frame { width: 560px; height: auto; min-height: 0; border: 0; border-radius: 0; box-shadow: none; }
+      body.shot .ocv-root { height: auto; overflow: visible; }
+      body.shot .ocv-header { position: static; }
+    </style>
+  </head>
+  <body>
+    <main class="demo">
+      <div class="chrome">
+        <h1>opencode-viewer</h1>
+        <p>
+          A live dashboard of the current <a href="https://opencode.ai">OpenCode</a> session, in a tab of OpenCode
+          Desktop's side region. This is the real plugin UI running on a made-up session: hover anything, click a
+          request column or a turn. <a href="https://github.com/koaning/opencode-viewer">Source and install →</a>
+        </p>
+        <div class="controls">
+          <span><span class="label">Theme</span><span class="group" id="mode"></span></span>
+          <span><span class="label">Panel width</span><span class="group" id="width"></span></span>
+          <span id="replay"></span>
+        </div>
+      </div>
+      <div class="frame" id="frame"><div id="app" style="height: 100%"></div></div>
+    </main>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

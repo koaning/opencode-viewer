@@ -2,7 +2,8 @@ import { createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import * as f from "../format"
 import type { ContextPoint, Step, Turn } from "../model"
 import { SPLIT_KEYS, type Cost } from "../pricing"
-import { COST, grouped, PRODUCED, type Palette } from "./buckets"
+import { COST, grouped, INK, PRODUCED, type Palette } from "./buckets"
+import { famProps, useFocus } from "./focus"
 import type { Tip } from "./tip"
 
 export interface Segment {
@@ -12,6 +13,8 @@ export interface Segment {
   /** A CSS color, usually one of the `--ocv-s*` slots. */
   readonly color: string
   readonly detail?: string
+  /** The family it lights up with across charts (see `focus.ts`); the key when left out. */
+  readonly fam?: string
 }
 
 const NONE: Segment = { key: "", label: "", value: 0, color: "transparent" }
@@ -48,6 +51,7 @@ export function StackBar(props: {
   const total = () => props.segments.reduce((sum, s) => sum + s.value, 0)
   const width = () => (props.max ? Math.min(100, Math.max(0.5, (total() / props.max) * 100)) : 100)
   const format = (value: number) => (props.format ?? f.tokens)(value)
+  const focus = useFocus()
   return (
     <div class="ocv-stack" classList={{ "ocv-stack-track": props.track }} style={{ height: `${props.height ?? 10}px` }}>
       <div class="ocv-stack-fill" style={{ width: `${width()}%` }}>
@@ -58,6 +62,7 @@ export function StackBar(props: {
               <div
                 class="ocv-seg"
                 style={{ "flex-grow": grow(segment().value, total()), background: segment().color }}
+                {...famProps(focus, segment().fam ?? segment().key)}
                 onPointerMove={(event) =>
                   props.tip?.show(
                     event,
@@ -75,7 +80,10 @@ export function StackBar(props: {
                     </>,
                   )
                 }
-                onPointerLeave={() => props.tip?.hide()}
+                onPointerLeave={() => {
+                  props.tip?.hide()
+                  focus.set(undefined)
+                }}
               />
             )
           }}
@@ -85,23 +93,26 @@ export function StackBar(props: {
   )
 }
 
-/** A legend for segments, with values and their share of `total`; `free` adds a row for the room left. */
+/**
+ * A legend for segments, with values and their share of `total`, in as many columns as the width allows. Hovering a
+ * row lights its family up on every chart.
+ */
 export function Legend(props: {
   readonly segments: readonly Segment[]
   readonly total?: number
-  readonly free?: number
   readonly format?: (v: number) => string
 }) {
   const list = keyed(() => props.segments)
   const total = () => props.total ?? props.segments.reduce((sum, s) => sum + s.value, 0)
   const format = (value: number) => (props.format ?? f.tokens)(value)
+  const focus = useFocus()
   return (
     <ul class="ocv-legend">
       <For each={list.keys()}>
         {(key) => {
           const segment = () => list.get(key)
           return (
-            <li title={segment().detail}>
+            <li title={segment().detail} {...famProps(focus, segment().fam ?? segment().key)}>
               <span class="ocv-swatch" style={{ background: segment().color }} />
               <span class="ocv-legend-label">{segment().label}</span>
               <span class="ocv-num">{format(segment().value)}</span>
@@ -110,31 +121,7 @@ export function Legend(props: {
           )
         }}
       </For>
-      <Show when={props.free !== undefined}>
-        <li class="ocv-legend-free">
-          <span class="ocv-swatch ocv-swatch-free" />
-          <span class="ocv-legend-label">Free space</span>
-          <span class="ocv-num">{format(props.free!)}</span>
-          <span class="ocv-num ocv-legend-share">{f.share(props.free!, total())}</span>
-        </li>
-      </Show>
     </ul>
-  )
-}
-
-/** A small legend without values, for a chart whose values live in its tooltips. */
-export function Key(props: { readonly items: readonly { label: string; color: string }[] }) {
-  return (
-    <div class="ocv-key">
-      <For each={props.items}>
-        {(item) => (
-          <span>
-            <span class="ocv-swatch" style={{ background: item.color }} />
-            {item.label}
-          </span>
-        )}
-      </For>
-    </div>
   )
 }
 
@@ -143,12 +130,9 @@ const KINDS = ["reasoning", "text", "calls"] as const
 /** Below this much context, a request with no cache hit is unremarkable: providers don't cache short prompts. */
 const MISS_MIN = 4096
 
-/** A request's cost as stacked parts: by kind when it splits, else one "reported" part. */
-const costParts = (cost: Cost | undefined): (readonly [string, number, string])[] => {
-  if (!cost || cost.kind === "none") return []
-  if (!cost.split) return [["reported", cost.value, COST.output.color]]
-  return SPLIT_KEYS.map((key) => [key, cost.split![key], COST[key].color] as const)
-}
+/** A request's cost as one part: the split by kind is in the tooltip, and its hues would mean other things here. */
+const costParts = (cost: Cost | undefined): (readonly [string, number, string])[] =>
+  !cost || cost.kind === "none" ? [] : [["cost", cost.value, INK]]
 
 /** The room between columns, less as they crowd in, so a long session still fits. */
 const gapFor = (n: number) => (n <= 16 ? 6 : n <= 40 ? 3 : n <= 90 ? 2 : n <= 200 ? 1 : 0)
@@ -254,7 +238,7 @@ export function ContextChart(props: {
           <For each={cost!.split ? SPLIT_KEYS.filter((k) => cost!.split![k] > 0) : []}>
             {(key) => (
               <div class="ocv-tip-row">
-                <span class="ocv-swatch" style={{ background: COST[key].color }} />
+                <span />
                 <span>{COST[key].label}</span>
                 <span class="ocv-num">{f.usd(cost!.split![key])}</span>
               </div>
@@ -340,42 +324,12 @@ interface ViewProps {
   readonly selected: () => number
 }
 
-function ProducedLabel() {
-  return (
-    <div class="ocv-chart-label ocv-key">
-      <span class="ocv-chart-label-title">What each request produced</span>
-      <For each={KINDS}>
-        {(kind) => (
-          <span>
-            <span class="ocv-swatch" style={{ background: PRODUCED[kind].color }} />
-            {PRODUCED[kind].label}
-          </span>
-        )}
-      </For>
-    </div>
-  )
+/** A band's name, one short line in the gutter: its colors are the context legend's. */
+function BandLabel(props: { readonly children: JSX.Element }) {
+  return <div class="ocv-band-label">{props.children}</div>
 }
 
 const isEstimate = (cost: Cost | undefined) => cost?.kind === "estimated" || cost?.kind === "fallback"
-
-function CostLabel(props: { readonly total: number; readonly estimated: boolean }) {
-  return (
-    <div class="ocv-chart-label ocv-key">
-      <span class="ocv-chart-label-title">
-        What each request cost · {props.estimated ? "≈" : ""}
-        {f.usd(props.total)}
-      </span>
-      <For each={SPLIT_KEYS}>
-        {(key) => (
-          <span>
-            <span class="ocv-swatch" style={{ background: COST[key].color }} />
-            {COST[key].label}
-          </span>
-        )}
-      </For>
-    </div>
-  )
-}
 
 /** One column per request, keyed by its step so a new one grows in and the rest ease to the new scale. */
 function ColumnView(props: ViewProps) {
@@ -410,13 +364,23 @@ function ColumnView(props: ViewProps) {
     )
   }
 
-  const Stack = (p: { readonly height: number; readonly segments: readonly (readonly [string, number, string])[] }) => {
+  const Stack = (p: {
+    readonly height: number
+    readonly segments: readonly (readonly [string, number, string])[]
+    readonly fam?: (key: string) => string
+  }) => {
     const list = keyed(() => p.segments.filter(([, v]) => v > 0).map(([key, value, color]) => ({ key, value, color, label: key })))
     const total = () => p.segments.reduce((sum, [, v]) => sum + Math.max(0, v), 0)
     return (
       <div class="ocv-col-stack" style={{ height: `${Math.min(100, p.height)}%` }}>
         <For each={list.keys()}>
-          {(key) => <div class="ocv-col-seg" style={{ "flex-grow": grow(list.get(key).value, total()), background: list.get(key).color }} />}
+          {(key) => (
+            <div
+              class="ocv-col-seg"
+              data-fam={p.fam ? p.fam(key) : key}
+              style={{ "flex-grow": grow(list.get(key).value, total()), background: list.get(key).color }}
+            />
+          )}
         </For>
       </div>
     )
@@ -443,18 +407,27 @@ function ColumnView(props: ViewProps) {
           )}
         </For>
       </div>
-      <ProducedLabel />
+      <BandLabel>Produced</BandLabel>
       <div class="ocv-cols ocv-cols-produced" style={rowStyle()}>
         <For each={steps()}>
           {(step) => (
             <Column step={step} class="ocv-col-produced">
-              {(point) => <Stack height={(outTotal(point()) / props.peakOut()) * 100} segments={producedParts(point())} />}
+              {(point) => (
+                <Stack
+                  height={(outTotal(point()) / props.peakOut()) * 100}
+                  segments={producedParts(point())}
+                  fam={(kind) => PRODUCED[kind as (typeof KINDS)[number]].key}
+                />
+              )}
             </Column>
           )}
         </For>
       </div>
       <Show when={props.peakCost() > 0}>
-        <CostLabel total={props.totalCost()} estimated={props.points.some((p) => isEstimate(props.cost(p)))} />
+        <BandLabel>
+          Cost · {props.points.some((p) => isEstimate(props.cost(p))) ? "≈" : ""}
+          {f.usd(props.totalCost())}
+        </BandLabel>
         <div class="ocv-cols ocv-cols-cost" style={rowStyle()}>
           <For each={steps()}>
             {(step) => (

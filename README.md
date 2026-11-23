@@ -7,8 +7,10 @@ A live dashboard of the current OpenCode session, in a tab of OpenCode Desktop's
   <img alt="The session dashboard" src="docs/screenshot-light.png" width="560">
 </picture>
 
-- **Context**: what fills the model's window: system prompt, your messages, reasoning, tool results, and free space.
-- **Overview**: active time, tokens processed (and how much was cached), cost, and turns, requests and tool calls.
+**[See it on the docs page →](https://koaning.github.io/opencode-viewer/)**: the dashboard for a made-up session, in light or dark and at different panel widths.
+
+- **Context**: what fills the model's window: system prompt, your messages, reasoning, tool results (and which tools).
+- **Overview**: active time, tokens processed (and how much was cached), cost, and turns, requests and tool calls. The headline numbers stay in the header as you scroll.
 - **Every request**: what each request's context held, what it produced, and what it cost.
 - **Turns**: a trace waterfall per prompt, with requests, tool calls and subagents you can expand.
 - **Tools**: calls, time and output per tool.
@@ -42,5 +44,6 @@ Models without a price (e.g. Ollama) can be costed as another model via **Price 
 bun run dev         # rebuild on save
 bun run typecheck
 bun test
-bun run screenshot  # regenerate docs/screenshot-*.png from a made-up session
+bun run demo        # the dashboard on a made-up session in the browser, live-reloading
+bun run screenshot  # regenerate docs/: the README screenshots and the static docs page (index.html)
 ```
