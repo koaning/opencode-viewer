@@ -1,30 +1,37 @@
-import type { Breakdown } from "../model"
-
-// Categorical slots (validated palette, see style.css). Color follows the entity: what a request produced keeps its
-// color once it sits in the context (reasoning is violet in both), and a tool keeps its slot everywhere.
+// Categorical slots (validated palette, see style.css). One hue means one thing on every chart of the dashboard:
+// blue is you, green the model writing, violet its thinking, amber the arguments it writes for tools, orange tools (their
+// results in the context, their time in a turn), red a compaction. Grey is the baseline: the system share, waiting.
 export const S = (n: number) => `var(--ocv-s${n})`
 export const NEUTRAL = "var(--ocv-neutral)"
 export const NEUTRAL_2 = "var(--ocv-neutral-2)"
+/** Money is its own axis, so cost bars get one quiet ink rather than a hue that means something else elsewhere. */
+export const INK = "var(--ocv-ink)"
+
+/**
+ * The family a series belongs to, shared across charts: hovering one lights up the same family everywhere.
+ * See `focus.ts`.
+ */
+export type Family = "system" | "summary" | "user" | "assistant" | "reasoning" | "calls" | "tools" | "waiting" | "cost"
 
 export const TIME = {
-  thinking: { label: "Thinking", color: S(7) },
-  model: { label: "Generating", color: S(1) },
-  tools: { label: "Tools", color: S(2) },
-  other: { label: "Waiting / other", color: NEUTRAL },
-}
+  thinking: { key: "reasoning", label: "Thinking", color: S(7) },
+  model: { key: "assistant", label: "Generating", color: S(3) },
+  tools: { key: "tools", label: "Tools", color: S(2) },
+  other: { key: "waiting", label: "Waiting", color: NEUTRAL },
+} as const satisfies Record<string, { key: Family; label: string; color: string }>
 
 export const PRODUCED = {
-  reasoning: { label: "Thinking", color: S(7) },
-  text: { label: "Text", color: S(3) },
-  calls: { label: "Tool call args", color: S(4) },
-}
+  reasoning: { key: "reasoning", label: "Thinking", color: S(7) },
+  text: { key: "assistant", label: "Text", color: S(3) },
+  calls: { key: "calls", label: "Tool call args", color: S(4) },
+} as const satisfies Record<string, { key: Family; label: string; color: string }>
 
-/** What a request's cost paid for. Cache reads are muted: the cheap part, however many tokens. */
+/** What a request's cost paid for; shown in tooltips, the bars themselves are one ink. */
 export const COST = {
-  cacheRead: { label: "Cache reads", color: NEUTRAL },
-  input: { label: "New input", color: S(1) },
-  cacheWrite: { label: "Cache writes", color: S(8) },
-  output: { label: "Output + thinking", color: S(3) },
+  cacheRead: { label: "Cache reads" },
+  input: { label: "New input" },
+  cacheWrite: { label: "Cache writes" },
+  output: { label: "Output + thinking" },
 }
 
 export interface Meta {
@@ -33,6 +40,9 @@ export interface Meta {
   readonly detail?: string
 }
 
+/** Every tool's results, together: one orange, like tool time in the turns. The legend and Tools table split them. */
+export const TOOLS = "tools"
+
 const FIXED: Record<string, Meta> = {
   system: { label: "System / tools", color: NEUTRAL, detail: "System prompt and tool definitions, measured from the first request" },
   summary: { label: "Compaction summary", color: S(8), detail: "What replaced the history before the last compaction" },
@@ -40,14 +50,11 @@ const FIXED: Record<string, Meta> = {
   assistant: { label: "Assistant text", color: S(3), detail: "The model's replies" },
   reasoning: { label: "Reasoning", color: S(7), detail: "Thinking the transcript kept" },
   calls: { label: "Tool call inputs", color: S(4), detail: "Arguments the model wrote for its tool calls" },
+  [TOOLS]: { label: "Tool results", color: S(2), detail: "What tools returned to the model" },
 }
-const TOOL_SLOTS = [S(2), S(5), S(6)]
-const OTHER_TOOLS = "tools:other"
+const ORDER = ["system", "summary", "user", "assistant", "reasoning", "calls", TOOLS]
 
-/**
- * The categories of the context, as the composition bar and the timeline show them: the fixed buckets, the three tools
- * whose results take the most room now with a slot each, and every other tool's results together.
- */
+/** The categories of the context, as the composition bar and the timeline show them. */
 export interface Palette {
   /** The category a part's key falls in. */
   readonly group: (key: string) => string
@@ -56,28 +63,12 @@ export interface Palette {
   readonly order: readonly string[]
 }
 
-export const paletteOf = (breakdown: Breakdown | undefined, keys: Iterable<string>): Palette => {
-  const top = (breakdown?.shares ?? [])
-    .filter((s) => s.bucket.kind === "tool")
-    .slice(0, TOOL_SLOTS.length)
-    .map((s) => (s.bucket.kind === "tool" ? s.bucket.name : ""))
-  const group = (key: string) => {
-    if (!key.startsWith("tool:")) return key
-    return top.includes(key.slice(5)) ? key : OTHER_TOOLS
-  }
-  const meta = (g: string): Meta => {
-    if (FIXED[g]) return FIXED[g]
-    if (g === OTHER_TOOLS) return { label: "Other tool results", color: NEUTRAL_2 }
-    const name = g.slice(5)
-    return { label: `${name} results`, color: TOOL_SLOTS[top.indexOf(name)] ?? NEUTRAL_2, detail: "What this tool returned to the model" }
-  }
+const group = (key: string) => (key.startsWith("tool:") ? TOOLS : key)
+const meta = (g: string): Meta => FIXED[g] ?? { label: g, color: NEUTRAL_2 }
+
+export const paletteOf = (keys: Iterable<string>): Palette => {
   const present = new Set([...keys].map(group))
-  const order = [
-    ...["system", "summary", "user", "assistant", "reasoning", "calls"].filter((k) => present.has(k)),
-    ...top.map((name) => `tool:${name}`).filter((k) => present.has(k)),
-    ...(present.has(OTHER_TOOLS) ? [OTHER_TOOLS] : []),
-  ]
-  return { group, meta, order }
+  return { group, meta, order: ORDER.filter((k) => present.has(k)) }
 }
 
 /** A point's parts summed by category. */
@@ -89,3 +80,11 @@ export const grouped = (parts: Readonly<Record<string, number>>, palette: Palett
   }
   return out
 }
+
+/** Tool results by tool name, largest first: what the one orange "Tool results" category is made of. */
+export const toolParts = (parts: Readonly<Record<string, number>>): [string, number][] =>
+  Object.entries(parts)
+    .filter(([key, value]) => key.startsWith("tool:") && value >= 1)
+    .map(([key, value]): [string, number] => [key.slice(5), value])
+    .sort((a, b) => b[1] - a[1])
+

@@ -1,6 +1,10 @@
 /*
  * Session dashboard. Text and surfaces use the host's --v2-* tokens, so it follows the app's theme. Chart series
- * use the dataviz reference categorical palette (validated light and dark), stepped per mode on [data-mode].
+ * use the dataviz reference categorical palette (validated light and dark), stepped per mode on [data-mode], and one
+ * hue means one thing everywhere (see view/buckets.ts).
+ *
+ * Built for a narrow side panel: the headline numbers come first and stay in the sticky header, and the layout steps
+ * with the panel's width through container queries at the end.
  */
 .ocv-root {
   --ocv-s1: #2a78d6;
@@ -11,8 +15,9 @@
   --ocv-s6: #008300;
   --ocv-s7: #6250d6;
   --ocv-s8: #e34948;
-  --ocv-neutral: #b9b7b0;
+  --ocv-neutral: #d6d4cd;
   --ocv-neutral-2: #7f7d77;
+  --ocv-ink: var(--ocv-neutral-2);
   --ocv-text: var(--v2-text-text-base, #0b0b0b);
   --ocv-muted: var(--v2-text-text-muted, #52514e);
   --ocv-faint: var(--v2-text-text-faint, #8a8984);
@@ -23,13 +28,15 @@
   --ocv-danger: var(--v2-state-fg-danger, #c4342f);
   --ocv-warning: var(--v2-state-fg-warning, #b26b00);
   --ocv-success: var(--v2-state-fg-success, #1f8a4c);
-  --ocv-selected: rgba(214, 158, 46, 0.14);
-  --ocv-selected-border: rgba(214, 158, 46, 0.6);
+  --ocv-selected: var(--ocv-layer-2);
+  --ocv-selected-border: var(--ocv-text);
+  --ocv-pad: 14px;
+  container-type: inline-size;
   position: relative;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 12px 14px 32px;
+  padding: 0 var(--ocv-pad) 24px;
   box-sizing: border-box;
   color: var(--ocv-text);
   font-family: var(--v2-font-family-sans, system-ui, sans-serif);
@@ -45,7 +52,7 @@
   --ocv-s6: #008300;
   --ocv-s7: #9085e9;
   --ocv-s8: #e66767;
-  --ocv-neutral: #5d5c58;
+  --ocv-neutral: #44433f;
   --ocv-neutral-2: #8f8d86;
   --ocv-surface: var(--v2-background-bg-base, #1a1a19);
 }
@@ -100,13 +107,23 @@
   border-radius: 4px;
 }
 
-/* Header */
+/* Header: sticky, and once the summary has scrolled away it carries the headline numbers. */
 .ocv-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
+  margin: 0 calc(-1 * var(--ocv-pad)) 8px;
+  padding: 10px var(--ocv-pad) 8px;
+  background: var(--ocv-surface);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.ocv-header.ocv-stuck {
+  border-bottom-color: var(--ocv-border);
 }
 .ocv-title {
   display: flex;
@@ -116,10 +133,21 @@
   font-weight: 600;
   font-size: 13px;
 }
-.ocv-title > span:nth-child(2) {
+.ocv-title-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ocv-actions,
+.ocv-link,
+.ocv-glance {
+  flex: none;
+}
+.ocv-glance {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 .ocv-status {
   flex: none;
@@ -141,91 +169,93 @@
   color: var(--ocv-success);
 }
 
-/* Context panel: the share of the window in use, one bar against the whole window, a row per category. */
-.ocv-ctx .ocv-ctx-head {
+/* Summary: the context against the window, then the session's other numbers on one line. */
+.ocv-summary {
+  margin-bottom: 16px;
+}
+.ocv-ctx-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 2px 0 6px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .ocv-ctx-big {
   font-size: 20px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.ocv-ctx-what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ocv-muted);
 }
 .ocv-ctx-of {
   color: var(--ocv-muted);
-  font-size: 13px;
 }
 .ocv-ctx-warn .ocv-ctx-big,
 .ocv-warn-text {
   color: var(--ocv-warning);
 }
 .ocv-ctx .ocv-legend {
-  margin-top: 10px;
-  gap: 4px;
-  font-size: 12px;
+  margin-top: 8px;
 }
 .ocv-ctx .ocv-legend-label {
   color: var(--ocv-muted);
 }
-.ocv-legend .ocv-legend-free {
-  margin-top: 10px;
-  color: var(--ocv-faint);
+.ocv-ctx-tools {
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.ocv-legend .ocv-legend-free .ocv-legend-label {
-  color: var(--ocv-faint);
-}
-.ocv-swatch-free {
-  background: var(--ocv-layer-2);
-  box-shadow: inset 0 0 0 1px var(--ocv-border);
+.ocv-ctx-tools .ocv-swatch {
+  margin-right: 6px;
 }
 .ocv-note {
   margin-top: 6px;
 }
 
-/* The other numbers, compact. */
-.ocv-strip {
+.ocv-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
-  gap: 6px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ocv-border);
 }
-.ocv-tile {
-  background: var(--ocv-layer);
-  border: 1px solid var(--ocv-border);
-  border-radius: 8px;
-  padding: 6px 8px;
+.ocv-kpi {
   min-width: 0;
 }
-.ocv-tile-label {
-  color: var(--ocv-muted);
-  font-size: 11px;
-}
-.ocv-tile-value {
-  font-size: 14px;
+.ocv-kpi-value {
+  font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  margin: 1px 0;
+  line-height: 1.25;
+  white-space: nowrap;
 }
-.ocv-tile-sub {
+.ocv-kpi-label {
   color: var(--ocv-muted);
-  font-size: 10.5px;
-  line-height: 1.35;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Sections */
 .ocv-section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .ocv-section h3 {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 .ocv-section h4 {
   font-size: 11px;
@@ -256,7 +286,8 @@
   height: 100%;
   transition:
     flex-grow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.3s;
+    background-color 0.3s,
+    opacity 0.15s;
 }
 .ocv-seg:first-child {
   border-top-left-radius: 4px;
@@ -283,13 +314,16 @@
   margin: 8px 0 0;
   padding: 0;
   display: grid;
-  gap: 2px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 16px;
 }
 .ocv-legend li {
   display: grid;
-  grid-template-columns: auto 1fr auto 3.5em;
+  grid-template-columns: auto minmax(0, 1fr) auto 3.4em;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  transition: opacity 0.15s;
 }
 .ocv-legend .ocv-swatch {
   margin: 0;
@@ -298,20 +332,12 @@
   text-align: right;
 }
 .ocv-legend-share {
-  color: var(--ocv-text);
+  color: var(--ocv-muted);
 }
 .ocv-legend-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.ocv-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  color: var(--ocv-muted);
-  font-size: 11px;
-  margin-bottom: 6px;
 }
 
 /* Every request: a column per request, context above, what it produced below, one x axis. */
@@ -320,13 +346,11 @@
   cursor: pointer;
   margin: 4px 0;
 }
-.ocv-chart-label {
-  margin: 8px 0 3px;
-  align-items: baseline;
-}
-.ocv-chart-label-title {
+.ocv-band-label {
+  margin: 6px 0 2px;
   color: var(--ocv-muted);
-  font-weight: 500;
+  font-size: 10.5px;
+  line-height: 1.2;
 }
 
 .ocv-cols {
@@ -335,15 +359,15 @@
   gap: 6px;
 }
 .ocv-cols-context {
-  height: 120px;
+  height: 96px;
   border-bottom: 1px solid var(--ocv-border);
 }
 .ocv-cols-produced {
-  height: 44px;
+  height: 32px;
   border-bottom: 1px solid var(--ocv-border);
 }
 .ocv-cols-cost {
-  height: 44px;
+  height: 28px;
   border-bottom: 1px solid var(--ocv-border);
 }
 .ocv-cols-axis {
@@ -377,7 +401,8 @@
   min-height: 1px;
   transition:
     flex-grow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.3s;
+    background-color 0.3s,
+    opacity 0.15s;
 }
 .ocv-col-hover .ocv-col-stack {
   filter: brightness(1.1);
@@ -472,11 +497,28 @@
 .ocv-turn.ocv-open {
   box-shadow: inset 2px 0 0 var(--ocv-selected-border);
 }
+.ocv-turn-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+  padding-left: 15px;
+}
+.ocv-turn-bar {
+  flex: 1;
+  min-width: 0;
+}
+.ocv-turn-bar .ocv-stack {
+  margin: 0;
+}
+.ocv-turn-meta {
+  flex: none;
+}
 .ocv-turn.ocv-open > .ocv-turn-head {
   background: var(--ocv-selected);
 }
 .ocv-turn-body {
-  padding: 8px 10px 14px;
+  padding: 6px 8px 12px;
 }
 .ocv-turn-chevron {
   flex: none;
@@ -498,14 +540,10 @@
   display: block;
   width: 100%;
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 7px 8px;
 }
 .ocv-turn-head:hover {
   background: var(--ocv-layer);
-}
-.ocv-turn-head .ocv-row.ocv-small {
-  flex-wrap: wrap;
-  gap: 4px 10px;
 }
 .ocv-turn-index {
   color: var(--ocv-muted);
@@ -551,7 +589,7 @@
 }
 .ocv-table th,
 .ocv-table td {
-  padding: 4px 6px;
+  padding: 3px 6px;
   border-bottom: 1px solid var(--ocv-border);
   text-align: left;
 }
@@ -565,6 +603,21 @@
 .ocv-sort {
   all: unset;
   cursor: pointer;
+}
+.ocv-bar-cell {
+  position: relative;
+}
+.ocv-cell-bar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ocv-s2) 20%, transparent);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ocv-cell-text {
+  position: relative;
 }
 .ocv-sorted {
   color: var(--ocv-text);
@@ -636,7 +689,7 @@
 .ocv-trace-selected,
 .ocv-trace-body .ocv-trace-row.ocv-trace-selected:hover {
   background: var(--ocv-selected);
-  box-shadow: inset 0 0 0 1px var(--ocv-selected-border);
+  box-shadow: inset 2px 0 0 var(--ocv-selected-border);
 }
 .ocv-trace-name {
   display: flex;
@@ -721,6 +774,7 @@
   margin-top: -4px;
   min-width: 2px;
   border-radius: 2px;
+  transition: opacity 0.15s;
 }
 .ocv-state-error .ocv-trace-tool .ocv-trace-bar,
 .ocv-trace-tool.ocv-state-error .ocv-trace-bar {
@@ -820,6 +874,47 @@
   border-radius: 6px;
   font-family: var(--v2-font-family-code, ui-monospace, monospace);
   font-size: 11px;
+}
+
+/* Focus: while a family is hovered, every other series' marks step back (see view/focus.ts). */
+/* :where() keeps this rule weak, so the family in focus (below) wins. */
+:where(.ocv-root[data-focus]) :where(.ocv-seg, .ocv-col-seg, .ocv-trace-bar, .ocv-legend li)[data-fam] {
+  opacity: 0.22;
+}
+.ocv-root[data-focus="system"] [data-fam="system"],
+.ocv-root[data-focus="summary"] [data-fam="summary"],
+.ocv-root[data-focus="user"] [data-fam="user"],
+.ocv-root[data-focus="assistant"] [data-fam="assistant"],
+.ocv-root[data-focus="reasoning"] [data-fam="reasoning"],
+.ocv-root[data-focus="calls"] [data-fam="calls"],
+.ocv-root[data-focus="tools"] [data-fam="tools"],
+.ocv-root[data-focus="waiting"] [data-fam="waiting"],
+.ocv-root[data-focus="cost"] [data-fam="cost"] {
+  opacity: 1;
+}
+
+/* Narrow panel: numbers two by two, the legend in one column, the turns' token count dropped. */
+@container (max-width: 420px) {
+  .ocv-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ocv-legend {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ocv-turn-tok,
+  .ocv-trace-detail {
+    display: none;
+  }
+  .ocv-trace-label {
+    max-width: none;
+    flex: 1;
+  }
+}
+/* Wide panel: the legend spreads to three columns. */
+@container (min-width: 680px) {
+  .ocv-legend {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

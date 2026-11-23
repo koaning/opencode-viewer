@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "prepublishOnly": "bun run build",
-    "screenshot": "bun scripts/screenshot/shoot.ts"
+    "screenshot": "bun demo/shoot.ts",
+    "demo": "vite --config demo/vite.config.ts"
   },
   "dependencies": {
     "@opencode/plugin": "2.2.5"

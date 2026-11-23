@@ -17,6 +17,8 @@ interface Bar {
   readonly end: number
   readonly color: string
   readonly label: string
+  /** Its family, for the dashboard's shared highlight (see focus.ts). */
+  readonly fam: string
 }
 
 interface Row {
@@ -42,10 +44,10 @@ const stepEnd = (step: Step, now: number) => step.completed ?? (step.running ? n
 const requestBars = (step: Step, now: number): Bar[] => {
   const end = stepEnd(step, now)
   const modelEnd = step.created + step.modelMs
-  const bars: Bar[] = [{ start: step.created, end: modelEnd, color: TIME.model.color, label: TIME.model.label }]
+  const bars: Bar[] = [{ start: step.created, end: modelEnd, color: TIME.model.color, label: TIME.model.label, fam: TIME.model.key }]
   for (const [start, stop] of step.thinking)
-    bars.push({ start: Math.max(step.created, start), end: Math.min(modelEnd, stop), color: TIME.thinking.color, label: TIME.thinking.label })
-  if (end > modelEnd) bars.push({ start: modelEnd, end, color: NEUTRAL, label: "Running its tools" })
+    bars.push({ start: Math.max(step.created, start), end: Math.min(modelEnd, stop), color: TIME.thinking.color, label: TIME.thinking.label, fam: TIME.thinking.key })
+  if (end > modelEnd) bars.push({ start: modelEnd, end, color: NEUTRAL, label: "Running its tools", fam: TIME.other.key })
   return bars
 }
 
@@ -83,7 +85,7 @@ const rowsOf = (turn: Turn, dashboard: Dashboard, now: number, open: (id: string
           start,
           end,
           state: stateOf(tool.status === "running" && step.running, tool.status === "error"),
-          bars: [{ start, end, color: TIME.tools.color, label: TIME.tools.label }],
+          bars: [{ start, end, color: TIME.tools.color, label: TIME.tools.label, fam: TIME.tools.key }],
           kids: childSteps.length,
           tool,
           session: child,
@@ -197,6 +199,7 @@ export function TurnTrace(props: {
                     {(bar) => (
                       <span
                         class="ocv-trace-bar"
+                        data-fam={bar.fam}
                         style={{ left: left(bar.start), width: width(bar.start, bar.end), background: bar.color }}
                         onPointerMove={(event) =>
                           props.tip.show(
@@ -280,7 +283,7 @@ function StepDetails(props: { readonly step: Step; readonly dashboard: Dashboard
   const produced = (): Segment[] => {
     const p = point()
     if (!p) return []
-    return (["reasoning", "text", "calls"] as const).map((kind) => ({ key: kind, value: p.produced[kind], ...PRODUCED[kind] }))
+    return (["reasoning", "text", "calls"] as const).map((kind) => ({ value: p.produced[kind], ...PRODUCED[kind] }))
   }
   const s = () => props.step
   return (
